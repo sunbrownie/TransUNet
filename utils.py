@@ -28,7 +28,7 @@ class DiceLoss(nn.Module):
         loss = (2 * intersect + smooth) / (z_sum + y_sum + smooth)
         loss = 1 - loss
         return loss
-   
+        
     def forward(self, inputs, target, weight=None, softmax=False):
         if softmax:
             inputs = torch.softmax(inputs, dim=1)

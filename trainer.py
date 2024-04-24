@@ -148,7 +148,7 @@ def trainer_penguin(args, model, snapshot_path):
                               4.09716955e-03, 2.97664854e-03, 1.91125018e-03, 2.64694398e-03,
                               2.73462262e-03, 2.71537110e-05, 3.93861040e-04, 6.55661204e-04,
                               7.85597368e-03, 1.92659288e-01, 1.92659288e-01, 1.92659288e-01,
-                              1.92659288e-01, 1.92659288e-01]).to(score.device)
+                              1.92659288e-01, 1.92659288e-01]).cuda()
 
     for epoch_num in iterator:
         for i_batch, sampled_batch in enumerate(trainloader):
