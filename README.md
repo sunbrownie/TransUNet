@@ -52,180 +52,22 @@ python test.py --dataset Synapse --vit_name R50-ViT-B_16
   year={2021}
 }
 ```
-# Coronary Artery Segmentation with 3D U-Net
+## New Features
 
-A deep learning project for 3D coronary artery segmentation using U-Net architecture with PyTorch and MONAI.
+### Enhanced Testing (`test_imagecas_enhanced.py`)
+- Evaluate both training and validation sets
+- Volume-level Dice and HD95 metrics
+- Save best/worst performing volumes
+- Support for random or specific volume evaluation
 
-## Overview
+### 3D U-Net Training (`train_3dunet.py`)
+- Full 3D volumetric segmentation
+- Adaptive memory management for different GPU sizes
+- Combined Dice and Focal Tversky loss
 
-This project implements a 3D U-Net model for segmenting coronary arteries from medical imaging data. The implementation uses the MONAI framework for medical image processing and PyTorch for deep learning.
+### Unified Inference (`unified_inference.py`)
+- Compare TransUNet and 3D U-Net predictions
+- Comprehensive metrics comparison
+- Visualization of results
+- Batch processing support
 
-## Features
-
-- **3D U-Net Architecture**: Supports both BasicUNet and standard U-Net configurations
-- **Comprehensive Data Augmentation**: Random rotations, flips, zooming, intensity adjustments
-- **Flexible Training Pipeline**: Customizable ROI sizes, batch sizes, and training parameters
-- **Evaluation Metrics**: Dice score calculation for segmentation quality assessment
-- **NIfTI Support**: Save predictions as NIfTI files with original metadata
-- **Visualization**: Built-in visualization of training progress and predictions
-
-## Requirements
-
-```bash
-pip install pytorch-ignite monai nibabel matplotlib torch torchvision
-```
-
-## Dataset Structure
-
-The code expects NIfTI files (.nii.gz) with the following naming convention:
-- Images: `{number}.img.nii.gz`
-- Labels: `{number}.label.nii.gz`
-
-Example:
-```
-dataset/
-├── 001.img.nii.gz
-├── 001.label.nii.gz
-├── 002.img.nii.gz
-├── 002.label.nii.gz
-...
-```
-
-## Usage
-
-### Basic Training
-
-```python
-from coronary_segmentation import CoronaryArterySegmentation
-
-# Create model instance
-model = CoronaryArterySegmentation(
-    roi=(96, 96, 96), 
-    batch_size=1, 
-    use_basic_unet=True
-)
-
-# Train the model
-model.fit(train_loader, val_loader, num_epochs=10)
-
-# Evaluate on validation set
-dice_scores = model.predict(val_loader, num_samples=5)
-```
-
-### Configuration Options
-
-- **ROI Size**: `(96, 96, 96)` - Region of interest dimensions
-- **Batch Size**: `1` - Training batch size
-- **Model Type**: `use_basic_unet=True` - Choose between BasicUNet and standard U-Net
-- **Augmentation**: Comprehensive set of 3D augmentations included
-
-### Data Augmentation
-
-The pipeline includes:
-- Random rotations (±30°)
-- Random flips on all axes
-- Random zooming (0.9-1.1x)
-- Random affine transformations
-- Intensity adjustments (contrast, shift, scale)
-- Gaussian noise addition
-
-## Model Architecture
-
-### BasicUNet Configuration
-- **Spatial Dimensions**: 3D
-- **Input Channels**: 1 (grayscale)
-- **Output Channels**: 2 (background + artery)
-- **Features**: (32, 64, 128, 256, 512, 32)
-- **Dropout**: 0.1
-
-### Standard U-Net Configuration
-- **Channels**: (16, 32, 64, 128)
-- **Strides**: (2, 2, 2)
-- **Residual Units**: 2 per block
-- **Normalization**: Batch normalization
-
-## Training Process
-
-1. **Data Loading**: Automatic pairing of image and label files
-2. **Preprocessing**: Spatial padding, intensity normalization, resampling
-3. **Augmentation**: Random transformations during training
-4. **Training**: Dice loss optimization with Adam optimizer
-5. **Validation**: Dice score evaluation on validation set
-6. **Model Saving**: Best model based on validation Dice score
-
-## Evaluation
-
-The model is evaluated using:
-- **Dice Score**: Primary metric for segmentation quality
-- **Visual Inspection**: Side-by-side comparison of predictions vs ground truth
-- **NIfTI Export**: Save predictions for external analysis
-
-## Results Visualization
-
-The training process includes:
-- Real-time loss monitoring
-- Validation Dice score tracking
-- Training history plots
-- Prediction visualizations with overlays
-
-## File Structure
-
-```
-coronary-artery-segmentation/
-├── coronary_segmentation.py          # Main implementation
-├── data_loading.py                   # Data loading utilities
-├── requirements.txt                  # Package dependencies
-├── README.md                        # This file
-└── examples/
-    ├── training_example.py          # Training script example
-    └── prediction_example.py        # Prediction script example
-```
-
-## Performance Notes
-
-- **Memory Usage**: Optimized for single batch processing
-- **GPU Support**: Automatic CUDA detection and usage
-- **Scalability**: Configurable ROI sizes for different memory constraints
-- **Reproducibility**: Consistent results with proper random seeding
-
-## Model Saving and Loading
-
-```python
-# Save trained model
-model.save_model('trained_model.pth')
-
-# Load pre-trained model
-model = CoronaryArterySegmentation()
-model.load_model('trained_model.pth')
-```
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests if applicable
-5. Submit a pull request
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Citation
-
-If you use this code in your research, please cite:
-
-```bibtex
-@misc{coronary_artery_segmentation,
-  title={3D Coronary Artery Segmentation with U-Net},
-  author={Your Name},
-  year={2025},
-  url={https://github.com/yourusername/coronary-artery-segmentation}
-}
-```
-
-## Acknowledgments
-
-- Built with [MONAI](https://monai.io/) framework
-- Uses [PyTorch](https://pytorch.org/) for deep learning
-- Inspired by medical imaging segmentation research
