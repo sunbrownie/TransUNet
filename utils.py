@@ -5,44 +5,95 @@ from scipy.ndimage import zoom
 import torch.nn as nn
 import SimpleITK as sitk
 
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
 
-class DiceLoss(nn.Module):
-    def __init__(self, n_classes):
-        super(DiceLoss, self).__init__()
-        self.n_classes = n_classes
+class FocalTverskyLoss(nn.Module):
+    """
+    Focal Tversky loss for small, imbalanced structures.
+    alpha → weight for FN, beta → weight for FP
+    gamma → focal parameter (γ=1 ⇒ plain Tversky)
+    """
+    def __init__(self, alpha=0.7, beta=0.3, gamma=0.75, smooth=1e-5):
+        super().__init__()
+        self.alpha, self.beta, self.gamma, self.smooth = alpha, beta, gamma, smooth
 
-    def _one_hot_encoder(self, input_tensor):
-        tensor_list = []
-        for i in range(self.n_classes):
-            temp_prob = input_tensor == i  # * torch.ones_like(input_tensor)
-            tensor_list.append(temp_prob.unsqueeze(1))
-        output_tensor = torch.cat(tensor_list, dim=1)
-        return output_tensor.float()
+    def forward(self, logits: torch.Tensor, target: torch.Tensor, softmax=True):
+        if softmax:
+            logits = torch.softmax(logits, dim=1)
 
-    def _dice_loss(self, score, target):
-        target = target.float()
-        smooth = 1e-5
-        intersect = torch.sum(score * target)
-        y_sum = torch.sum(target * target)
-        z_sum = torch.sum(score * score)
-        loss = (2 * intersect + smooth) / (z_sum + y_sum + smooth)
-        loss = 1 - loss
+        # foreground channel only (index 1)
+        probs_fg  = logits[:, 1]
+        target_fg = (target == 1).float()
+
+        tp = (probs_fg * target_fg).sum()
+        fp = (probs_fg * (1 - target_fg)).sum()
+        fn = ((1 - probs_fg) * target_fg).sum()
+
+        tversky = (tp + self.smooth) / (tp + self.alpha * fn + self.beta * fp + self.smooth)
+        loss    = (1 - tversky) ** self.gamma
         return loss
+        
+class DiceLoss(nn.Module):
+    """
+    Dice loss that matches the original call pattern **but**
+    returns Dice loss for *only* the artery / foreground class (index 1).
 
-    def forward(self, inputs, target, weight=None, softmax=False):
+    ─ Call exactly as before ─────────────────────────────────────────────
+        loss_fn = DiceLoss(n_classes=2)
+        loss    = loss_fn(logits, labels, weight=None, softmax=True)
+
+      • logits: (B, 2, H, W[, D])  raw network outputs
+      • labels: (B, H, W[, D])     integer mask 0 = background, 1 = artery
+    """
+
+    def __init__(self, n_classes: int = 2, smooth: float = 1e-5):
+        super().__init__()
+        self.n_classes = n_classes
+        self.smooth    = smooth
+
+    # --------------------------------------------------------------------- utils
+    def _one_hot_encoder(self, x: torch.Tensor) -> torch.Tensor:
+        """
+        Convert (B, H, W[, D]) integer mask to one-hot (B, C, …).
+        Implemented with torch’s native one_hot; keeps device & dtype.
+        """
+        x = x.long()
+        one_hot = F.one_hot(x, num_classes=self.n_classes)            # (B, …, C)
+        one_hot = one_hot.permute(0, -1, *range(1, x.ndim))           # (B, C, …)
+        return one_hot.float()
+
+    def _dice_loss(self, pred: torch.Tensor, tgt: torch.Tensor) -> torch.Tensor:
+        """
+        pred, tgt shapes: (B, …) with probs in pred and binary mask in tgt.
+        """
+        inter = (pred * tgt).sum()
+        denom = (pred * pred).sum() + (tgt * tgt).sum()
+        dice  = (2 * inter + self.smooth) / (denom + self.smooth)
+        return 1 - dice                     # 1 – Dice = loss
+
+    # ------------------------------------------------------------------- forward
+    def forward(
+        self,
+        inputs: torch.Tensor,
+        target: torch.Tensor,
+        weight=None,                    # kept for API compatibility (ignored)
+        softmax: bool = False,
+    ) -> torch.Tensor:
+
         if softmax:
             inputs = torch.softmax(inputs, dim=1)
-        target = self._one_hot_encoder(target)
-        if weight is None:
-            weight = [1] * self.n_classes
-        assert inputs.size() == target.size(), 'predict {} & target {} shape do not match'.format(inputs.size(), target.size())
-        class_wise_dice = []
-        loss = 0.0
-        for i in range(0, self.n_classes):
-            dice = self._dice_loss(inputs[:, i], target[:, i])
-            class_wise_dice.append(1.0 - dice.item())
-            loss += dice * weight[i]
-        return loss / self.n_classes
+
+        # One-hot encode on the **same device** as inputs
+        target_oh = self._one_hot_encoder(target).to(inputs.device)
+
+        # Use only class-1 (artery) channel
+        pred_fg   = inputs[:, 1]
+        tgt_fg    = target_oh[:, 1]
+
+        loss = self._dice_loss(pred_fg, tgt_fg)
+        return loss
 
 
 def calculate_metric_percase(pred, gt):
@@ -99,4 +150,4 @@ def test_single_volume(image, label, net, classes, patch_size=[256, 256], test_s
         sitk.WriteImage(prd_itk, test_save_path + '/'+case + "_pred.nii.gz")
         sitk.WriteImage(img_itk, test_save_path + '/'+ case + "_img.nii.gz")
         sitk.WriteImage(lab_itk, test_save_path + '/'+ case + "_gt.nii.gz")
-    return metric_list
+    return metric_list, prediction

@@ -1,4 +1,4 @@
-import argparse
+# %%
 import logging
 import os
 import random
@@ -7,87 +7,97 @@ import torch
 import torch.backends.cudnn as cudnn
 from networks.vit_seg_modeling import VisionTransformer as ViT_seg
 from networks.vit_seg_modeling import CONFIGS as CONFIGS_ViT_seg
-from trainer import trainer_synapse
+from networks.vit_seg_modeling import SegmentationHead
+from trainer import trainer_penguin
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--root_path', type=str,
-                    default='../data/Synapse/train_npz', help='root dir for data')
-parser.add_argument('--dataset', type=str,
-                    default='Synapse', help='experiment_name')
-parser.add_argument('--list_dir', type=str,
-                    default='./lists/lists_Synapse', help='list dir')
-parser.add_argument('--num_classes', type=int,
-                    default=9, help='output channel of network')
-parser.add_argument('--max_iterations', type=int,
-                    default=30000, help='maximum epoch number to train')
-parser.add_argument('--max_epochs', type=int,
-                    default=150, help='maximum epoch number to train')
-parser.add_argument('--batch_size', type=int,
-                    default=24, help='batch_size per gpu')
-parser.add_argument('--n_gpu', type=int, default=1, help='total gpu')
-parser.add_argument('--deterministic', type=int,  default=1,
-                    help='whether use deterministic training')
-parser.add_argument('--base_lr', type=float,  default=0.01,
-                    help='segmentation network learning rate')
-parser.add_argument('--img_size', type=int,
-                    default=224, help='input patch size of network input')
-parser.add_argument('--seed', type=int,
-                    default=1234, help='random seed')
-parser.add_argument('--n_skip', type=int,
-                    default=3, help='using number of skip-connect, default is num')
-parser.add_argument('--vit_name', type=str,
-                    default='R50-ViT-B_16', help='select one vit model')
-parser.add_argument('--vit_patches_size', type=int,
-                    default=16, help='vit_patches_size, default is 16')
-args = parser.parse_args()
+# %%
+# Manually setting what previously were command-line arguments
+args = {
+    'root_path': '../data/Penguin/train_processed_224',
+    'dataset': 'Penguin',
+    'list_dir': './lists/lists_Penguin',
+    'num_classes': 30,
+    'max_iterations': 30000,
+    'max_epochs': 150,
+    'batch_size': 24,
+    'n_gpu': 1,
+    'deterministic': 1,
+    'base_lr': 0.01,
+    'img_size': 224,
+    'seed': 1234,
+    'n_skip': 3,
+    'vit_name': 'R50-ViT-B_16',
+    'vit_patches_size': 16,
+     'base_lr': 0.01
+}
 
+# Use the arguments
+# For example, if you had a line like this in your original script:
+# print(args.root_path)
+# Replace it with this in the modified script:
+# print(args['root_path'])
 
 if __name__ == "__main__":
-    if not args.deterministic:
+    if not args['deterministic']:
         cudnn.benchmark = True
         cudnn.deterministic = False
     else:
         cudnn.benchmark = False
         cudnn.deterministic = True
 
-    random.seed(args.seed)
-    np.random.seed(args.seed)
-    torch.manual_seed(args.seed)
-    torch.cuda.manual_seed(args.seed)
-    dataset_name = args.dataset
+    random.seed(args['seed'])
+    np.random.seed(args['seed'])
+    torch.manual_seed(args['seed'])
+    torch.cuda.manual_seed(args['seed'])
+    dataset_name = args['dataset']
     dataset_config = {
-        'Synapse': {
-            'root_path': '../data/Synapse/train_npz',
-            'list_dir': './lists/lists_Synapse',
-            'num_classes': 9,
+        'Penguin': {
+            'root_path': "/home/ubuntu/files/project_TransUNet/data/Penguin/train_processed_224",
+            'list_dir': "/home/ubuntu/files/project_TransUNet/TransUNet/lists/lists_Penguin",
+            'num_classes': 30,
         },
     }
-    args.num_classes = dataset_config[dataset_name]['num_classes']
-    args.root_path = dataset_config[dataset_name]['root_path']
-    args.list_dir = dataset_config[dataset_name]['list_dir']
-    args.is_pretrain = True
-    args.exp = 'TU_' + dataset_name + str(args.img_size)
-    snapshot_path = "../model/{}/{}".format(args.exp, 'TU')
-    snapshot_path = snapshot_path + '_pretrain' if args.is_pretrain else snapshot_path
-    snapshot_path += '_' + args.vit_name
-    snapshot_path = snapshot_path + '_skip' + str(args.n_skip)
-    snapshot_path = snapshot_path + '_vitpatch' + str(args.vit_patches_size) if args.vit_patches_size!=16 else snapshot_path
-    snapshot_path = snapshot_path+'_'+str(args.max_iterations)[0:2]+'k' if args.max_iterations != 30000 else snapshot_path
-    snapshot_path = snapshot_path + '_epo' +str(args.max_epochs) if args.max_epochs != 30 else snapshot_path
-    snapshot_path = snapshot_path+'_bs'+str(args.batch_size)
-    snapshot_path = snapshot_path + '_lr' + str(args.base_lr) if args.base_lr != 0.01 else snapshot_path
-    snapshot_path = snapshot_path + '_'+str(args.img_size)
-    snapshot_path = snapshot_path + '_s'+str(args.seed) if args.seed!=1234 else snapshot_path
+    args['num_classes'] = dataset_config[dataset_name]['num_classes']
+    args['root_path'] = dataset_config[dataset_name]['root_path']
+    args['list_dir'] = dataset_config[dataset_name]['list_dir']
+    args['is_pretrain'] = True
+    args['exp'] = 'TU_' + dataset_name + str(args['img_size'])
+    args['max_epochs'] = 150
 
+    snapshot_path = "../model/{}/{}".format(args['exp'], 'TU')
+    snapshot_path = snapshot_path + '_pretrain' if args['is_pretrain'] else snapshot_path
+    snapshot_path += '_' + args['vit_name']
+    snapshot_path = snapshot_path + '_skip' + str(args['n_skip'])
+    snapshot_path = snapshot_path + '_vitpatch' + str(args['vit_patches_size']) if args['vit_patches_size'] != 16 else snapshot_path
+    snapshot_path = snapshot_path + '_' + str(args['max_iterations'])[0:2] + 'k' if args['max_iterations'] != 30000 else snapshot_path
+    snapshot_path = snapshot_path + '_epo' + str(args['max_epochs']) if args['max_epochs'] != 30 else snapshot_path
+    snapshot_path = snapshot_path + '_bs' + str(args['batch_size'])
+    snapshot_path = snapshot_path + '_lr' + str(args['base_lr']) if args['base_lr'] != 0.01 else snapshot_path
+    snapshot_path = snapshot_path + '_' + str(args['img_size'])
+    snapshot_path = snapshot_path + '_s' + str(args['seed']) if args['seed'] != 1234 else snapshot_path
+
+    snapshot_path = "/home/ubuntu/files/project_TransUNet/model/vit_checkpoint/imagenet21k/"
     if not os.path.exists(snapshot_path):
         os.makedirs(snapshot_path)
-    config_vit = CONFIGS_ViT_seg[args.vit_name]
-    config_vit.n_classes = args.num_classes
-    config_vit.n_skip = args.n_skip
-    if args.vit_name.find('R50') != -1:
-        config_vit.patches.grid = (int(args.img_size / args.vit_patches_size), int(args.img_size / args.vit_patches_size))
-    net = ViT_seg(config_vit, img_size=args.img_size, num_classes=config_vit.n_classes).cuda()
-    net.load_from(weights=np.load(config_vit.pretrained_path))
+    config_vit = CONFIGS_ViT_seg[args['vit_name']]
+    config_vit.n_classes = 9
+    config_vit.n_skip = args['n_skip']
+    config_vit.pretrained_path = "/home/ubuntu/files/project_TransUNet/model/vit_checkpoint/imagenet21k/R50+ViT-B_16.npz"
+    if args['vit_name'].find('R50') != -1:
+        config_vit.patches.grid = (int(args['img_size'] / args['vit_patches_size']), int(args['img_size'] / args['vit_patches_size']))
+    net = ViT_seg(config_vit, img_size=args['img_size'], num_classes=9).cuda()
+    
+    #net.load_from(weights=np.load(config_vit.pretrained_path))
+    net.load_state_dict(torch.load("/home/ubuntu/files/project_TransUNet/model/vit_checkpoint/imagenet21k/epoch_59.pth"))
 
-    trainer = {'Synapse': trainer_synapse,}
+    net.segmentation_head = SegmentationHead(
+        in_channels=config_vit['decoder_channels'][-1],
+        out_channels= args['num_classes'], 
+        kernel_size=3
+    ).cuda()
+
+    #net = ViT_seg(config_vit, img_size=args['img_size'], num_classes=30).cuda()
+    #net.load_state_dict(torch.load("/home/ubuntu/files/project_TransUNet/model/vit_checkpoint/imagenet21k/epoch_3.pth"))
+
+    trainer = {'Penguin': trainer_penguin}
     trainer[dataset_name](args, net, snapshot_path)
